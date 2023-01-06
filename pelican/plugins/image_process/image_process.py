@@ -334,8 +334,12 @@ def harvest_images_in_fragment(fragment, settings):
         except KeyError:
             raise RuntimeError("Derivative %s undefined." % derivative)
 
+        logger.debug("%s Found setting %s for image %s." %
+                     (LOG_PREFIX, derivative, img["src"]))
+
         if isinstance(d, list):
             # Single source image specification.
+            logger.debug("%s Implicit Image type." % LOG_PREFIX)
             process_img_tag(img, settings, derivative)
 
         elif not isinstance(d, dict):
@@ -349,13 +353,16 @@ def harvest_images_in_fragment(fragment, settings):
 
         elif d["type"] == "image":
             # Single source image specification.
+            logger.debug("%s Image type." % LOG_PREFIX)
             process_img_tag(img, settings, derivative)
 
         elif d["type"] == "responsive-image" and "srcset" not in img.attrs:
             # srcset image specification.
+            logger.debug("%s SrcSet type." % LOG_PREFIX)
             build_srcset(img, settings, derivative)
 
         elif d["type"] == "picture":
+            logger.debug("%s Picture type." % LOG_PREFIX)
             # Multiple source (picture) specification.
             group = img.find_parent()
             if group.name == "div":
@@ -426,6 +433,8 @@ def process_img_tag(img, settings, derivative):
         return
     process = settings["IMAGE_PROCESS"][derivative]
 
+    logger.debug("process_img_tag.")
+
     img["src"] = posixpath.join(path.base_url, path.filename)
     destination = os.path.join(path.base_path, path.filename)
 
@@ -452,6 +461,9 @@ def build_srcset(img, settings, derivative):
             path.source,
         )
         return
+
+    logger.debug("%s Using setting 'settings[\"IMAGE_PROCESS\"][%s]'." %
+                 (LOG_PREFIX, derivative))
     process = settings["IMAGE_PROCESS"][derivative]
 
     default = process["default"]
@@ -471,9 +483,13 @@ def build_srcset(img, settings, derivative):
         destination = os.path.join(path.base_path, default_name, path.filename)
         process_image((path.source, destination, default), settings)
 
+    logger.debug("%s Setting src to %s /// %s /// %s." %
+                 (LOG_PREFIX, path.base_url, default_name, path.filename))
     img["src"] = posixpath.join(path.base_url, default_name, path.filename)
 
     if "sizes" in process:
+        logger.debug("%s Setting sizes to %s." %
+                     (LOG_PREFIX, process["sizes"]))
         img["sizes"] = process["sizes"]
 
     srcset = []
@@ -484,6 +500,9 @@ def build_srcset(img, settings, derivative):
         process_image((path.source, destination, src[1]), settings)
 
     if len(srcset) > 0:
+        logger.debug("%s Setting srcset to %s." %
+                     (LOG_PREFIX, ", ".join(srcset)))
+
         img["srcset"] = ", ".join(srcset)
 
 
