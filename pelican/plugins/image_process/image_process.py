@@ -34,6 +34,14 @@ IMAGE_PROCESS_REGEX = re.compile("image-process-[-a-zA-Z0-9_]+")
 
 Path = collections.namedtuple("Path", ["base_url", "source", "base_path", "filename"])
 
+log_id = 0
+
+def UniqueLogPrefix():
+    """Bypass Pelican LimitFilter by providing a unique log prefix."""
+    global log_id
+    log_id += 1
+    return "%s %8d" % (LOG_PREFIX, log_id)
+
 
 # A lot of inspiration from pyexiftool (https://github.com/smarnach/pyexiftool)
 class ExifTool(object):
@@ -112,7 +120,7 @@ class ExifTool(object):
             output += os.read(fd, ExifTool.block_size)
         exiftool_result = output.strip()[: -len(ExifTool.sentinel)]
         logger.debug(
-            "{} exiftool result: {}".format(LOG_PREFIX, exiftool_result.decode("utf-8"))
+            "{} exiftool result: {}".format(UniqueLogPrefix(), exiftool_result.decode("utf-8"))
         )
 
 
@@ -287,7 +295,7 @@ def set_default_settings(settings):
 def harvest_images(path, context):
     set_default_settings(context)
 
-    logger.debug("%s harvesting %r", LOG_PREFIX, path)
+    logger.debug("%s harvesting %r", UniqueLogPrefix(), path)
     with open(path, "r+", encoding=context["IMAGE_PROCESS_ENCODING"]) as f:
         res = harvest_images_in_fragment(f, context)
         f.seek(0)
@@ -321,7 +329,12 @@ def harvest_images_in_fragment(fragment, settings):
     if copy_exif_tags:
         ExifTool.start_exiftool()
 
+    logger.debug("%s Fragment content: %s" % (UniqueLogPrefix(), fragment))
+
     for img in soup.find_all("img", class_=IMAGE_PROCESS_REGEX):
+
+        logger.debug("%s Found <img>: %s" % (UniqueLogPrefix(), str(img)))
+
         for c in img["class"]:
             if c.startswith("image-process-"):
                 derivative = c[14:]
@@ -335,11 +348,11 @@ def harvest_images_in_fragment(fragment, settings):
             raise RuntimeError("Derivative %s undefined." % derivative)
 
         logger.debug("%s Found setting %s for image %s." %
-                     (LOG_PREFIX, derivative, img["src"]))
+                     (UniqueLogPrefix(), derivative, img["src"]))
 
         if isinstance(d, list):
             # Single source image specification.
-            logger.debug("%s Implicit Image type." % LOG_PREFIX)
+            logger.debug("%s Implicit Image type." % UniqueLogPrefix())
             process_img_tag(img, settings, derivative)
 
         elif not isinstance(d, dict):
@@ -353,16 +366,16 @@ def harvest_images_in_fragment(fragment, settings):
 
         elif d["type"] == "image":
             # Single source image specification.
-            logger.debug("%s Image type." % LOG_PREFIX)
+            logger.debug("%s Image type." % UniqueLogPrefix())
             process_img_tag(img, settings, derivative)
 
         elif d["type"] == "responsive-image" and "srcset" not in img.attrs:
             # srcset image specification.
-            logger.debug("%s SrcSet type." % LOG_PREFIX)
+            logger.debug("%s SrcSet type." % UniqueLogPrefix())
             build_srcset(img, settings, derivative)
 
         elif d["type"] == "picture":
-            logger.debug("%s Picture type." % LOG_PREFIX)
+            logger.debug("%s Picture type." % UniqueLogPrefix())
             # Multiple source (picture) specification.
             group = img.find_parent()
             if group.name == "div":
@@ -433,8 +446,6 @@ def process_img_tag(img, settings, derivative):
         return
     process = settings["IMAGE_PROCESS"][derivative]
 
-    logger.debug("process_img_tag.")
-
     img["src"] = posixpath.join(path.base_url, path.filename)
     destination = os.path.join(path.base_path, path.filename)
 
@@ -463,7 +474,7 @@ def build_srcset(img, settings, derivative):
         return
 
     logger.debug("%s Using setting 'settings[\"IMAGE_PROCESS\"][%s]'." %
-                 (LOG_PREFIX, derivative))
+                 (UniqueLogPrefix(), derivative))
     process = settings["IMAGE_PROCESS"][derivative]
 
     default = process["default"]
@@ -484,12 +495,12 @@ def build_srcset(img, settings, derivative):
         process_image((path.source, destination, default), settings)
 
     logger.debug("%s Setting src to %s /// %s /// %s." %
-                 (LOG_PREFIX, path.base_url, default_name, path.filename))
+                 (UniqueLogPrefix(), path.base_url, default_name, path.filename))
     img["src"] = posixpath.join(path.base_url, default_name, path.filename)
 
     if "sizes" in process:
         logger.debug("%s Setting sizes to %s." %
-                     (LOG_PREFIX, process["sizes"]))
+                     (UniqueLogPrefix(), process["sizes"]))
         img["sizes"] = process["sizes"]
 
     srcset = []
@@ -501,7 +512,7 @@ def build_srcset(img, settings, derivative):
 
     if len(srcset) > 0:
         logger.debug("%s Setting srcset to %s." %
-                     (LOG_PREFIX, ", ".join(srcset)))
+                     (UniqueLogPrefix(), ", ".join(srcset)))
 
         img["srcset"] = ", ".join(srcset)
 
@@ -729,7 +740,7 @@ def process_image(image, settings):
     image[1] = unquote(image[1])
     # image[2] is the transformation
 
-    logger.debug("{} {} -> {}".format(LOG_PREFIX, image[0], image[1]))
+    logger.debug("{} {} -> {}".format(UniqueLogPrefix(), image[0], image[1]))
 
     os.makedirs(os.path.dirname(image[1]), exist_ok=True)
 
@@ -764,7 +775,7 @@ def dump_config(pelican):
 
     logger.debug(
         "{} config:\n{}".format(
-            LOG_PREFIX, pprint.pformat(pelican.settings["IMAGE_PROCESS"])
+            UniqueLogPrefix(), pprint.pformat(pelican.settings["IMAGE_PROCESS"])
         )
     )
 
